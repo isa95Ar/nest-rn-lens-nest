@@ -11,7 +11,7 @@ the status, and the time it took.
 ```
 
 It is the server half of **NestRN Lens**, a toolkit for Turborepo monorepos with
-a NestJS API and a React Native (Expo) app. On its own it gives you readable
+a NestJS API and a React Native (Expo) or Next.js app. On its own it gives you readable
 request logs and a typed event for every call. With the [NestRN Lens VS Code
 extension](https://marketplace.visualstudio.com/items?itemName=IsaiasDiaz.nest-rn-lens), those events become a live traffic panel where you can click any
 request to open the screen that made it or the handler that answered it.
@@ -72,7 +72,7 @@ adds that with three headers:
 | Header                    | Example                                         | Used for                                          |
 | ------------------------- | ----------------------------------------------- | ------------------------------------------------- |
 | `x-nest-rn-lens-app`      | `mobile`                                        | Which app made the request                        |
-| `x-nest-rn-lens-caller`   | `/repo/apps/mobile/src/screens/orders.tsx:23`   | The file and line that made it                    |
+| `x-nest-rn-lens-caller`   | `/repo/apps/mobile/src/screens/orders.tsx:23`   | The file and line that made it, or the page path for web apps (`/orders/42`) |
 | `x-nest-rn-lens-trace-id` | `5f0c…`                                         | Linking every hop of one request chain            |
 
 You don't have to write these by hand. The upcoming React Native client,

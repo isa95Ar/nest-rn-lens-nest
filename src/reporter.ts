@@ -35,15 +35,25 @@ export class NestRnLensReporter {
     return `${from} → ${target.method} ${target.route} → ${target.controller}.${target.handler} ${status} ${durationMs}ms`;
   }
 
-  // Clients send absolute paths (editors need them to open the file); logs are
-  // easier to read relative to the monorepo root.
-  private shortPath(file?: string): string | undefined {
-    if (!file?.startsWith('/')) {
-      return file;
+  private shortPath(caller?: string): string | undefined {
+    if (!caller || !SOURCE_LOCATION.test(caller)) {
+      return caller;
     }
     this.repoRoot ??= findRepoRoot(process.cwd());
-    return relative(this.repoRoot, file);
+    return formatCaller(caller, this.repoRoot);
   }
+}
+
+// "/repo/apps/mobile/src/screens/Orders.tsx:23": an absolute file path plus a line.
+const SOURCE_LOCATION = /^\/.+:\d+$/;
+
+/**
+ * Callers that are source locations are shown relative to the monorepo root
+ * (clients send absolute paths so editors can open them). Anything else, such as
+ * a web page path like "/orders/42", is shown as sent.
+ */
+export function formatCaller(caller: string, repoRoot: string): string {
+  return SOURCE_LOCATION.test(caller) ? relative(repoRoot, caller) : caller;
 }
 
 const ROOT_MARKERS = ['turbo.json', 'pnpm-workspace.yaml', '.git'];

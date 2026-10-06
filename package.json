@@ -1,6 +1,6 @@
 {
   "name": "@nest-rn-lens/nest",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "NestJS interceptor that reports every request together with the React Native screen that made it. Part of NestRN Lens.",
   "keywords": [
     "nestjs",
@@ -12,7 +12,8 @@
     "monorepo",
     "observability",
     "tracing",
-    "devtools"
+    "devtools",
+    "nextjs"
   ],
   "license": "MIT",
   "author": "isa",
