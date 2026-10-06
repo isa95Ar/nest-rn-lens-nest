@@ -12,8 +12,8 @@ the status, and the time it took.
 
 It is the server half of **NestRN Lens**, a toolkit for Turborepo monorepos with
 a NestJS API and a React Native (Expo) app. On its own it gives you readable
-request logs and a typed event for every call. With the NestRN Lens VS Code
-extension, those events become a live traffic panel where you can click any
+request logs and a typed event for every call. With the [NestRN Lens VS Code
+extension](https://marketplace.visualstudio.com/items?itemName=IsaiasDiaz.nest-rn-lens), those events become a live traffic panel where you can click any
 request to open the screen that made it or the handler that answered it.
 
 ## Install
@@ -184,7 +184,7 @@ response. Native React Native apps don't use CORS at all.
 | ----------------------------- | ----------------------------------------------------------------- | ------------- |
 | `@nest-rn-lens/nest`          | This interceptor                                                  | Available     |
 | `@nest-rn-lens/react-native`  | `fetch` wrapper that sends the app name and the calling screen    | Coming soon   |
-| NestRN Lens for VS Code       | Live traffic panel with the app running in a phone frame          | Coming soon   |
+| [NestRN Lens for VS Code](https://marketplace.visualstudio.com/items?itemName=IsaiasDiaz.nest-rn-lens) | Live traffic panel with the app running in a phone frame | Available |
 
 ## Development
 

@@ -1,6 +1,6 @@
 {
   "name": "@nest-rn-lens/nest",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "NestJS interceptor that reports every request together with the React Native screen that made it. Part of NestRN Lens.",
   "keywords": [
     "nestjs",
@@ -16,6 +16,14 @@
   ],
   "license": "MIT",
   "author": "isa",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isa95Ar/nest-rn-lens-nest.git"
+  },
+  "homepage": "https://github.com/isa95Ar/nest-rn-lens-nest#readme",
+  "bugs": {
+    "url": "https://github.com/isa95Ar/nest-rn-lens-nest/issues"
+  },
   "main": "./dist/cjs/index.js",
   "types": "./dist/cjs/index.d.ts",
   "exports": {
