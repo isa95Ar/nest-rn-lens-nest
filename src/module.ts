@@ -1,5 +1,6 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { DEFAULT_MAX_BODY_BYTES, DEFAULT_REDACT_KEYS } from './capture.js';
 import { NEST_RN_LENS_OPTIONS } from './constants.js';
 import { NestRnLensInterceptor } from './interceptor.js';
 import { NestRnLensReporter } from './reporter.js';
@@ -20,6 +21,9 @@ export class NestRnLensModule {
       ...options,
       enabled: options.enabled ?? process.env.NODE_ENV !== 'production',
       log: options.log ?? true,
+      captureBodies: options.captureBodies ?? true,
+      maxBodyBytes: options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES,
+      redactKeys: [...DEFAULT_REDACT_KEYS, ...(options.redactKeys ?? [])],
     };
     return {
       module: NestRnLensModule,

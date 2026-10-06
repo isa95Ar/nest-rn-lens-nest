@@ -13,6 +13,19 @@ export const NEST_RN_LENS_HEADERS = {
 
 export type Platform = 'ios' | 'android' | 'web' | 'unknown';
 
+/** A request or response body, made safe to log. */
+export interface CapturedBody {
+  /** Size of the serialized body, in bytes. */
+  size: number;
+  /** The body, with sensitive fields redacted. Absent when truncated or summarized. */
+  value?: unknown;
+  /** Set when the body was larger than `maxBodyBytes`; `preview` holds its start. */
+  truncated?: boolean;
+  preview?: string;
+  /** For bodies that aren't JSON: "[binary 12.0 KB]", "[stream]". */
+  summary?: string;
+}
+
 /** One request, as seen by the API. */
 export interface NestRnLensEvent {
   id: string;
@@ -42,6 +55,20 @@ export interface NestRnLensEvent {
   status: number;
   /** Message of the exception, when the handler threw. */
   error?: string;
+  /** What the client sent. Only present when `captureBodies` is on (the default). */
+  request?: {
+    /** Request headers; sensitive ones redacted. */
+    headers: Record<string, string>;
+    query?: unknown;
+    /** Route parameters, e.g. { id: "42" } for /orders/:id. */
+    params?: unknown;
+    body?: CapturedBody;
+  };
+  /** What the API answered. Only present when `captureBodies` is on (the default). */
+  response?: {
+    /** The handler's return value, or the error body Nest sends for an exception. */
+    body?: CapturedBody;
+  };
 }
 
 export interface NestRnLensOptions {
@@ -62,4 +89,19 @@ export interface NestRnLensOptions {
    * debug level that the NestRN Lens VS Code extension reads). Defaults to `true`.
    */
   log?: boolean;
+  /**
+   * Include request and response bodies, query, route params and request
+   * headers in each event. Defaults to `true`. Sensitive fields are redacted
+   * (see `redactKeys`).
+   */
+  captureBodies?: boolean;
+  /** Bodies larger than this are cut to a preview. Defaults to 16 KB. */
+  maxBodyBytes?: number;
+  /**
+   * Extra field or header names to redact, added to the defaults (password,
+   * secret, token, authorization, cookie, apiKey, privateKey, creditCard,
+   * cardNumber, cvv, ssn). Matched ignoring case and separators, anywhere in
+   * the name: "token" also covers "accessToken".
+   */
+  redactKeys?: string[];
 }

@@ -8,6 +8,15 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { type Observable, tap } from 'rxjs';
+import {
+  captureBody,
+  captureHeaders,
+  type CaptureOptions,
+  DEFAULT_MAX_BODY_BYTES,
+  DEFAULT_REDACT_KEYS,
+  errorResponseBody,
+  nonEmpty,
+} from './capture.js';
 import { NEST_RN_LENS_OPTIONS } from './constants.js';
 import {
   detectPlatform,
@@ -51,7 +60,16 @@ export class NestRnLensInterceptor implements NestInterceptor {
     // Lets the client, and the next service in the chain, reuse the trace id.
     writeHeader(res, NEST_RN_LENS_HEADERS.traceId, traceId);
 
-    const finish = (status: number, error?: string) => {
+    // Captured before the handler runs, in case it mutates the request.
+    const capture = this.captureOptions();
+    const request = capture && {
+      headers: captureHeaders(req.headers, capture.redactKeys),
+      query: captureValue(nonEmpty(req.query), capture),
+      params: captureValue(nonEmpty(req.params), capture),
+      body: captureBody(req.body, capture),
+    };
+
+    const finish = (status: number, error?: string, responseBody?: unknown) => {
       const event: NestRnLensEvent = {
         id: randomUUID(),
         traceId,
@@ -72,20 +90,30 @@ export class NestRnLensInterceptor implements NestInterceptor {
         },
         status,
         error,
+        ...(capture && { request, response: { body: captureBody(responseBody, capture) } }),
       };
       this.reporter.report(event);
     };
 
     return next.handle().pipe(
       tap({
-        next: () => finish(this.successStatus(context, req, res)),
+        next: (body: unknown) => finish(this.successStatus(context, req, res), undefined, body),
         error: (err: unknown) =>
           finish(
             err instanceof HttpException ? err.getStatus() : 500,
             err instanceof Error ? err.message : String(err),
+            errorResponseBody(err),
           ),
       }),
     );
+  }
+
+  private captureOptions(): CaptureOptions | undefined {
+    const { captureBodies, maxBodyBytes, redactKeys } = this.options;
+    if (captureBodies === false) {
+      return undefined;
+    }
+    return { maxBodyBytes: maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES, redactKeys: redactKeys ?? DEFAULT_REDACT_KEYS };
   }
 
   /**
@@ -104,4 +132,9 @@ export class NestRnLensInterceptor implements NestInterceptor {
     }
     return req.method === 'POST' ? 201 : 200;
   }
+}
+
+/** Small values (query, params) keep their structure; their redacted value is all we need. */
+function captureValue(value: unknown, capture: CaptureOptions): unknown {
+  return captureBody(value, capture)?.value;
 }

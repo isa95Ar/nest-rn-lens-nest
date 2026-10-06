@@ -1,6 +1,6 @@
 {
   "name": "@nest-rn-lens/nest",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "NestJS interceptor that reports every request together with the React Native screen that made it. Part of NestRN Lens.",
   "keywords": [
     "nestjs",

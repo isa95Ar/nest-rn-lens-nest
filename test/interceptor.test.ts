@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -10,6 +11,8 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
+  StreamableFile,
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
@@ -28,8 +31,18 @@ class PokemonController {
   }
 
   @Post()
-  create() {
-    return { ok: true };
+  create(@Body() body: Record<string, unknown>) {
+    return { ok: true, received: body, accessToken: 'abc123' };
+  }
+
+  @Get('search/all')
+  search(@Query('q') q: string) {
+    return { q, results: Array.from({ length: 1000 }, (_, i) => ({ id: i, name: `Pokémon number ${i}` })) };
+  }
+
+  @Get(':id/sprite')
+  sprite() {
+    return new StreamableFile(Buffer.from('not really a png'));
   }
 
   @Delete(':id')
@@ -133,6 +146,52 @@ for (const platform of ['express', 'fastify'] as const) {
       assert.equal(crash.event.status, 500);
       assert.equal(crash.event.error, 'boom');
     });
+
+    it('captures the request and the response, with secrets redacted', async () => {
+      const response = await fetch(`${url}/pokemon?debug=1`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer xyz', 'x-request-tag': 'test' },
+        body: JSON.stringify({ name: 'Pikachu', password: 'hunter2', profile: { apiKey: 'k-1', level: 5 } }),
+      });
+      await response.arrayBuffer();
+      const event = events[events.length - 1];
+
+      assert.deepEqual(event.request?.query, { debug: '1' });
+      assert.deepEqual(event.request?.body?.value, {
+        name: 'Pikachu',
+        password: '[redacted]',
+        profile: { apiKey: '[redacted]', level: 5 },
+      });
+      assert.equal(event.request?.headers.authorization, '[redacted]');
+      assert.equal(event.request?.headers['x-request-tag'], 'test');
+      assert.deepEqual(event.response?.body?.value, {
+        ok: true,
+        received: { name: 'Pikachu', password: '[redacted]', profile: { apiKey: '[redacted]', level: 5 } },
+        accessToken: '[redacted]',
+      });
+    });
+
+    it('captures route params and the error body Nest sends', async () => {
+      const { event } = await call('GET', '/pokemon/999');
+      assert.deepEqual(event.request?.params, { id: '999' });
+      assert.deepEqual(event.response?.body?.value, { message: 'No such pokemon', error: 'Not Found', statusCode: 404 });
+
+      const crash = await call('GET', '/pokemon/1/crash');
+      assert.deepEqual(crash.event.response?.body?.value, { statusCode: 500, message: 'Internal server error' });
+    });
+
+    it('cuts large bodies to a preview and summarizes files', async () => {
+      const { event } = await call('GET', '/pokemon/search/all?q=pika');
+      const body = event.response?.body;
+      assert.equal(body?.truncated, true);
+      assert.equal(body?.value, undefined);
+      assert.ok(body!.size > 16 * 1024, `size ${body?.size}`);
+      assert.equal(body?.preview?.length, 16 * 1024);
+      assert.ok(body?.preview?.startsWith('{"q":"pika","results":['));
+
+      const sprite = await call('GET', '/pokemon/1/sprite');
+      assert.equal(sprite.event.response?.body?.summary, '[stream]');
+    });
   });
 }
 
@@ -161,6 +220,41 @@ describe('NestRnLensModule options', () => {
       assert.equal(events.length, 0);
     } finally {
       process.env.NODE_ENV = previous;
+    }
+  });
+
+  it('leaves bodies out when captureBodies is false', async () => {
+    const events: NestRnLensEvent[] = [];
+    const { app, url } = await startApp('express', { app: 'api', enabled: true, log: false, captureBodies: false, onEvent: (e) => events.push(e) });
+    try {
+      await (await fetch(`${url}/pokemon/1`)).arrayBuffer();
+      assert.equal(events.length, 1);
+      assert.equal(events[0].request, undefined);
+      assert.equal(events[0].response, undefined);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('redacts extra keys and honors a smaller size limit', async () => {
+    const events: NestRnLensEvent[] = [];
+    const { app, url } = await startApp('express', {
+      app: 'api',
+      enabled: true,
+      log: false,
+      maxBodyBytes: 30,
+      redactKeys: ['name'],
+      onEvent: (e) => events.push(e),
+    });
+    try {
+      await (
+        await fetch(`${url}/pokemon`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"name":"Mew"}' })
+      ).arrayBuffer();
+      assert.deepEqual(events[0].request?.body?.value, { name: '[redacted]' });
+      assert.equal(events[0].response?.body?.truncated, true);
+      assert.equal(events[0].response?.body?.preview?.length, 30);
+    } finally {
+      await app.close();
     }
   });
 

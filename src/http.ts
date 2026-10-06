@@ -14,6 +14,10 @@ export interface HttpRequest {
   routeOptions?: { url?: string };
   /** Fastify 3. */
   routerPath?: string;
+  /** Parsed by Nest's body parser (Express) or by Fastify. */
+  body?: unknown;
+  query?: unknown;
+  params?: unknown;
 }
 
 export interface HttpResponse {

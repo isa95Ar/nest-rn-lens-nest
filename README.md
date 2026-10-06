@@ -4,7 +4,8 @@
 
 A NestJS interceptor that records every request your API handles: the app and
 the exact file and line that sent it, the endpoint and the handler that answered,
-the status, and the time it took.
+the status, the time it took, and the request and response bodies (with secrets
+redacted).
 
 ```
 [NestRnLens] mobile (ios) apps/mobile/src/screens/order-details.tsx:23 → GET /orders/:id → OrdersController.findOne 200 4ms
@@ -64,6 +65,22 @@ That's it. Every request handled by a controller is now logged:
 Requests show `unknown` until the client says who it is. The next section
 explains how.
 
+## Step by step with React Native or Next.js
+
+1. **API:** install the package and add `NestRnLensModule.forRoot({ app: 'api' })`
+   to your root module (above).
+2. **API:** enable CORS in development (`app.enableCors()` in `main.ts`), since
+   web builds call the API from another origin. See [Browsers and CORS](#browsers-and-cors).
+3. **App:** route your API calls through one helper that adds the
+   `x-nest-rn-lens-app` header (and, on the web, `x-nest-rn-lens-caller` with
+   `window.location.pathname`), only in development.
+4. **Watch:** read the log lines, use `onEvent`, or open the
+   [NestRN Lens VS Code extension](https://marketplace.visualstudio.com/items?itemName=IsaiasDiaz.nest-rn-lens),
+   which starts everything and shows the traffic live.
+
+Copy-paste helpers for React Native (Expo) and Next.js are in the extension's
+guide: [Integrate your app, step by step](https://github.com/isa95Ar/nest-rn-lens-vscode#integrate-your-app-step-by-step).
+
 ## Telling the API who's calling
 
 A request on its own doesn't say which app or which screen sent it. The client
@@ -105,6 +122,9 @@ NestRnLensModule.forRoot({
   enabled: true,
   log: true,
   onEvent: (event) => {},
+  captureBodies: true,
+  maxBodyBytes: 16 * 1024,
+  redactKeys: ['pin'],
 });
 ```
 
@@ -114,6 +134,9 @@ NestRnLensModule.forRoot({
 | `enabled` | `boolean`                         | `true` unless `NODE_ENV=production`  | Turns the interceptor on or off. When off, requests pass through untouched.                   |
 | `log`     | `boolean`                         | `true`                               | Logs a readable line per request, plus the full event as JSON at debug level.                 |
 | `onEvent` | `(event: NestRnLensEvent) => void` | none                                 | Called with every event. Forward traffic to your own tooling, tests or metrics.               |
+| `captureBodies` | `boolean`                   | `true`                               | Adds the request (headers, query, route params, body) and the response body to each event.    |
+| `maxBodyBytes`  | `number`                    | `16384` (16 KB)                      | Bodies larger than this are cut to a preview of that many characters.                          |
+| `redactKeys`    | `string[]`                  | `[]`                                 | Extra field or header names to hide, added to the built-in list (see below).                   |
 
 ### The event
 
@@ -138,12 +161,60 @@ interface NestRnLensEvent {
   };
   status: number; // 200, 201, 404, 500…
   error?: string; // exception message, when the handler threw
+  request?: {
+    headers: Record<string, string>; // sensitive ones redacted
+    query?: unknown; // { type: "water" }
+    params?: unknown; // { id: "42" } for /orders/:id
+    body?: CapturedBody;
+  };
+  response?: {
+    body?: CapturedBody; // the handler's return value, or the error body Nest sends
+  };
+}
+
+interface CapturedBody {
+  size: number; // bytes, once serialized
+  value?: unknown; // the body, redacted (absent when truncated or summarized)
+  truncated?: boolean; // larger than maxBodyBytes...
+  preview?: string; // ...so this holds its start
+  summary?: string; // "[binary 12.0 KB]", "[stream]" for non-JSON bodies
 }
 ```
+
+`request` and `response` are present when `captureBodies` is on (the default).
 
 `route` is the route pattern, not the URL, so all calls to one endpoint group
 together. `status` follows Nest's rules: `@HttpCode()` when set, `201` for
 `POST`, the exception's status when a handler throws, and `500` for other errors.
+
+## Request and response bodies
+
+Each event carries what the client sent and what the API answered, so you can
+see the data behind every request, not just its status:
+
+- **Request:** headers, query parameters, route parameters and the parsed body.
+- **Response:** the value the handler returned. When a handler throws, it's the
+  error body Nest sends, for example
+  `{ "statusCode": 404, "message": "Order #42 not found", "error": "Not Found" }`.
+
+**Secrets are redacted.** Any field or header whose name contains one of these
+words is replaced with `"[redacted]"`, at any depth, in bodies, query, params
+and headers:
+
+`password`, `passwd`, `secret`, `token`, `authorization`, `cookie`, `apiKey`,
+`privateKey`, `creditCard`, `cardNumber`, `cvv`, `ssn`
+
+Matching ignores case and separators, so `api_key`, `API-Key` and `apiKey` are
+all covered, and `token` also hides `accessToken` and `refreshToken`. Add your
+own with `redactKeys`.
+
+**Large and binary bodies are summarized.** A body bigger than `maxBodyBytes`
+(16 KB by default) keeps only a text preview of its start. Files and streams
+(`StreamableFile`, buffers) show as `[binary 12.0 KB]` or `[stream]`, and are
+never read.
+
+Turn it all off with `captureBodies: false`, for example if your API handles
+data that shouldn't appear in development logs at all.
 
 ## Safe by design
 
@@ -155,6 +226,8 @@ watches:
 - **Never breaks a request.** If your `onEvent` callback or the logger throws,
   the error is swallowed and the response goes out as usual.
 - **Doesn't change responses.** The only thing it adds is the trace id header.
+- **Redacts secrets.** Passwords, tokens, cookies and similar fields never
+  appear in captured bodies or headers (see above).
 - **HTTP only.** Microservice, WebSocket and GraphQL contexts pass straight
   through.
 
