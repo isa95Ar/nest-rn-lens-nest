@@ -1,0 +1,69 @@
+{
+  "name": "@nest-rn-lens/nest",
+  "version": "0.1.0",
+  "description": "NestJS interceptor that reports every request together with the React Native screen that made it. Part of NestRN Lens.",
+  "keywords": [
+    "nestjs",
+    "nest",
+    "interceptor",
+    "react-native",
+    "expo",
+    "turborepo",
+    "monorepo",
+    "observability",
+    "tracing",
+    "devtools"
+  ],
+  "license": "MIT",
+  "author": "isa",
+  "main": "./dist/cjs/index.js",
+  "types": "./dist/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "clean": "node -e \"for (const d of ['dist', 'dist-test']) require('fs').rmSync(d, { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json && tsc -p tsconfig.esm.json && node scripts/mark-formats.cjs",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run clean && tsc -p tsconfig.test.json && node --test \"dist-test/test/**/*.test.js\"",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^10.0.0 || ^11.0.0 || ^12.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0 || ^12.0.0",
+    "rxjs": "^7.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/platform-express": "^12.1.2",
+    "@nestjs/platform-fastify": "^12.1.2",
+    "@types/node": "^22.20.5",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "typescript": "^6.0.3"
+  },
+  "module": "./dist/esm/index.js"
+}
